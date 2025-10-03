@@ -1,0 +1,19 @@
+# Dependency directories
+node_modules/
+
+# Build output
+dist
+build
+.vercel/
+
+# IDE configuration files
+.idea/
+.vscode/
+
+# Environment variables file
+.env
+.env*.local
+
+# OS-generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>뇌 손상 시뮬레이터: 크리티컬 임팩트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            overflow: hidden;
+        }
+        .brain-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+        }
+        #skull {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            transition: opacity 0.3s ease-in;
+            transform: translate(0,0);
+        }
+        #brain {
+            position: absolute;
+            width: 85%;
+            height: 85%;
+            top: 7.5%;
+            left: 7.5%;
+            z-index: 5;
+            transition: transform 0.2s ease-out;
+            transform: translate(0,0);
+        }
+        .target-area {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 20;
+            background-color: rgba(255, 255, 0, 0);
+            transition: background-color 0.2s;
+        }
+        .target-area:hover {
+            background-color: rgba(255, 255, 0, 0.4);
+            border: 2px dashed #FFFF00;
+        }
+        .target-area.clicked {
+            background-color: rgba(255, 0, 0, 0.7);
+            border: 2px solid #FF0000;
+        }
+        #coup-target { width: 35%; height: 40%; top: 30%; left: 55%; }
+        #counter-coup-target { width: 35%; height: 40%; top: 30%; left: 10%; }
+        
+        .impact-effect {
+            position: absolute; width: 60px; height: 60px;
+            background-color: red; border-radius: 50%;
+            opacity: 0; z-index: 6;
+            transform: translate(-50%, -50%); pointer-events: none;
+        }
+        #impact-coup { top: 50%; left: 90%; }
+        #impact-counter-coup { top: 50%; left: 10%; }
+
+        #rotation-meter-container { display: none; }
+        #rotation-meter-bar { transition: width 1s ease-out; }
+
+        .animate-level1 #skull, .animate-level2 #skull, .animate-level3 #skull, .animate-level4 #skull { opacity: 0.2; }
+
+        @keyframes impact-flash {
+            0% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); }
+        }
+        .animate-level1 #impact-coup { animation: impact-flash 0.4s ease-out 0.5s; }
+        .animate-level2 #impact-coup { animation: impact-flash 0.4s ease-out 0.5s; }
+        .animate-level2 #impact-counter-coup { animation: impact-flash 0.4s ease-out 1s; }
+        .animate-level3 #impact-counter-coup { animation: impact-flash 0.4s ease-out 0.2s; }
+        .animate-level3 #impact-coup { animation: impact-flash 0.4s ease-out 0.8s; }
+
+        @keyframes impact-baseball {
+            0% { transform: translate(0, 0); opacity: 1; }
+            50% { transform: translate(-100px, -20px); opacity: 1; }
+            100% { transform: translate(-120px, -30px); opacity: 0; }
+        }
+        @keyframes brain-shake {
+            0%, 100% { transform: translate(0, 0); } 25% { transform: translate(2px, 0); }
+            50% { transform: translate(-2px, 0); } 75% { transform: translate(2px, 0); }
+        }
+        @keyframes brain-deceleration {
+            0% { transform: translate(0, 0); } 50% { transform: translate(15px, 0); }
+            100% { transform: translate(-15px, 0); }
+        }
+        @keyframes skull-acceleration {
+            0% { transform: translate(0, 0); } 50% { transform: translate(-15px, 0); }
+            100% { transform: translate(0, 0); }
+        }
+        @keyframes brain-acceleration {
+            0% { transform: translate(0, 0); } 50% { transform: translate(0, 0); }
+            100% { transform: translate(15px, 0); }
+        }
+        @keyframes skull-rotation {
+            0% { transform: rotate(0deg); } 50% { transform: rotate(20deg); }
+            100% { transform: rotate(-10deg); }
+        }
+        @keyframes brain-rotation {
+            0% { transform: rotate(0deg); } 25% { transform: rotate(0deg); }
+            75% { transform: rotate(20deg); } 100% { transform: rotate(-10deg); }
+        }
+
+        #baseball {
+            position: absolute; width: 50px; height: 50px;
+            top: 50%; left: calc(100% + 20px);
+            transform: translateY(-50%); z-index: 30; display: none;
+        }
+        .animate-level1 #baseball { display: block; animation: impact-baseball 0.5s ease-in forwards; }
+        .animate-level1 #brain { animation: brain-shake 0.3s ease-in-out 0.5s; }
+        .animate-level2 #brain { animation: brain-deceleration 1s ease-in-out forwards; }
+        .animate-level3 #skull { animation: skull-acceleration 1s ease-in-out forwards; }
+        .animate-level3 #brain { animation: brain-acceleration 1s ease-in-out forwards; }
+        .animate-level4 #skull { animation: skull-rotation 1s ease-in-out forwards; }
+        .animate-level4 #brain { animation: brain-rotation 1.2s ease-in-out forwards; }
+
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.6); z-index: 40;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            position: relative;
+            z-index: 50;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto">
+        <header class="text-center mb-4">
+            <h1 class="text-4xl font-bold text-cyan-400">뇌 손상 시뮬레이터: 크리티컬 임팩트</h1>
+            <p class="text-gray-400 mt-2">물리 법칙을 통해 뇌 손상 기전을 이해해보세요.</p>
+            <p class="text-sm text-gray-500 mt-1">안산대학교 물리치료학과 심경섭 교수</p>
+        </header>
+
+        <div id="level-selector" class="flex flex-wrap justify-center gap-2 mb-4">
+            <button data-level="1" class="level-btn bg-gray-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Level 1</button>
+            <button data-level="2" class="level-btn bg-gray-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Level 2</button>
+            <button data-level="3" class="level-btn bg-gray-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Level 3</button>
+            <button data-level="4" class="level-btn bg-gray-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Level 4</button>
+        </div>
+
+        <main class="flex flex-col md:flex-row gap-8 items-center justify-center bg-gray-800 p-6 rounded-2xl shadow-2xl">
+            <div class="w-full md:w-1/2 flex justify-center items-center">
+                <div id="simulation-container" class="brain-container">
+                    <svg id="skull" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M50 2C23.49 2 2 23.49 2 50C2 76.51 23.49 98 50 98C70.36 98 87.89 84.15 93.39 65.5H75C72.24 65.5 70 63.26 70 60.5V40.5C70 37.74 72.24 35.5 75 35.5H94.48C90.35 15.65 71.8 2 50 2Z" fill="#E0E0E0"/></svg>
+                    <svg id="brain" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M72.8,12.5c-5.8-3-12.3-4.6-19-4.9c-11.5-0.5-22.6,3.6-30,11.5c-4.8,5.1-7.8,11.6-8.7,18.4c-1.3,10,2.6,20,9.8,27.1c3.1,3.1,6.8,5.5,10.8,7.2c-2.3,1.9-4.3,4.2-5.9,6.7c-1,1.5-1.8,3-2.5,4.6c-0.2,0.5-0.1,1,0.3,1.3c0.4,0.3,0.9,0.3,1.3,0c0.8-1.7,1.7-3.4,2.8-5c1.7-2.7,3.9-5.1,6.4-7.1c4.5-0.2,8.9-1.2,13.1-3c9.1-3.9,16.5-11,19.8-20.2C85.5,43.7,83.2,26.2,72.8,12.5z" fill="#F472B6"/></svg>
+                    <div id="impact-coup" class="impact-effect"></div>
+                    <div id="impact-counter-coup" class="impact-effect"></div>
+                    <div id="coup-target" class="target-area" data-area="coup"></div>
+                    <div id="counter-coup-target" class="target-area" data-area="counter-coup"></div>
+                    <svg id="baseball" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="white"/><path d="M25 28C40 40 60 55 75 72" stroke="red" stroke-width="5" stroke-linecap="round"/><path d="M28 75C40 60 55 40 72 25" stroke="red" stroke-width="5" stroke-linecap="round"/></svg>
+                </div>
+            </div>
+
+            <div class="w-full md:w-1/2 text-left space-y-4">
+                <h2 id="level-title" class="text-2xl font-bold text-yellow-400">시나리오를 선택해주세요.</h2>
+                <p id="mission-description" class="text-gray-300"></p>
+                <div id="rotation-meter-container" class="w-full bg-gray-700 rounded-full h-4">
+                    <div id="rotation-meter-bar" class="bg-red-600 h-4 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="instruction" class="text-lg font-semibold text-white"></p>
+                <button id="dai-diagnose-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">DAI 진단하기</button>
+                <button id="replay-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition-colors hidden">애니메이션 다시보기</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal" class="modal-backdrop hidden">
+        <div class="modal-content w-full max-w-md bg-gray-800 border-2 rounded-2xl shadow-lg p-6 text-center" id="modal-content">
+            <h3 id="modal-title" class="text-3xl font-bold mb-4"></h3>
+            <p id="modal-explanation" class="text-gray-300 mb-6"></p>
+            <div id="modal-buttons" class="flex flex-col gap-2"></div>
+        </div>
+    </div>
+    
+    <div id="ai-modal" class="modal-backdrop hidden">
+        <div class="modal-content w-full max-w-lg bg-gray-800 border-2 border-purple-400 rounded-2xl shadow-lg p-6">
+             <h3 class="text-2xl font-bold mb-4 text-purple-400 text-center">✨ AI 전문가에게 질문하기</h3>
+             <div id="ai-response-area" class="w-full h-48 bg-gray-900 rounded-lg p-3 mb-4 overflow-y-auto text-gray-300">AI의 답변이 여기에 표시됩니다...</div>
+             <div id="ai-loader" class="hidden justify-center items-center h-48"><div class="loader"></div></div>
+             <p class="text-sm text-gray-400 mb-2">예시 질문:</p>
+             <div id="suggested-questions" class="flex flex-wrap gap-2 mb-4"></div>
+             <textarea id="user-question" class="w-full bg-gray-700 rounded-lg p-2 text-white" placeholder="뇌 손상과 관련하여 궁금한 점을 입력하세요..."></textarea>
+             <div class="flex gap-2 mt-4">
+                <button id="ai-ask-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">질문하기</button>
+                <button id="ai-close-btn" class="w-1/3 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">닫기</button>
+             </div>
+        </div>
+    </div>
+
+    <div id="summary-modal" class="modal-backdrop hidden">
+        <div class="modal-content w-full max-w-2xl bg-gray-800 border-2 border-yellow-400 rounded-2xl shadow-lg p-8 text-left" id="summary-content">
+            <h3 class="text-3xl font-bold mb-4 text-yellow-400 text-center">축하합니다! 모든 레벨을 클리어했습니다.</h3>
+            <p class="text-center text-gray-300 mb-6">뇌 손상 메커니즘에 대한 이해가 깊어지셨습니다. 핵심 내용을 요약해봅시다.</p>
+            <div class="space-y-4 text-gray-300">
+                <div>
+                    <h4 class="font-bold text-xl text-cyan-400">Level 1: 접촉 손상 (Coup Injury)</h4>
+                    <p>정지한 머리에 외부 물체가 충돌할 때, 충격이 가해진 지점 바로 아래에 국소적으로 발생하는 손상입니다. 두개골 골절, 타박상 등이 특징입니다.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xl text-cyan-400">Level 2: 감속 손상 (Deceleration Injury)</h4>
+                    <p>달리던 머리가 갑자기 멈출 때, 뇌는 관성에 의해 앞으로 쏠립니다. 이때 뇌의 앞부분이 먼저 두개골에 부딪히고(1차 타격 손상), 그 반동으로 뒷부분이 부딪힙니다(2차 반충 손상).</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xl text-cyan-400">Level 3: 가속 손상 (Acceleration Injury)</h4>
+                    <p>정지한 머리가 뒤에서 충격을 받아 앞으로 튕겨 나갈 때 발생합니다. 뇌는 관성으로 제자리에 머물려 해, 뒤로 움직인 두개골과 먼저 충돌(1차 타격)하고, 반동으로 앞쪽 두개골과 충돌(2차 반충)합니다.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xl text-red-500">Level 4: 미만성 축삭 손상 (Diffuse Axonal Injury - DAI)</h4>
+                    <p>직접적인 충돌보다, 머리가 비틀리는 '회전력'이 가해질 때 가장 치명적입니다. 뇌가 뒤틀리면서 내부의 신경세포 다발(축삭)이 광범위하게 늘어나거나 끊어지는 손상으로, 초기 CT에서는 잘 보이지 않지만 심각한 후유증을 남길 수 있습니다.</p>
+                </div>
+            </div>
+             <p class="text-center text-sm text-gray-500 mt-6">안산대학교 물리치료학과 심경섭 교수</p>
+             <button id="summary-close-btn" class="w-full mt-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors">다시 플레이하기</button>
+        </div>
+    </div>
+
+    <script>
+        const gameData = {
+            1: {
+                title: 'Level 1: 접촉 손상 (Contact Injury)',
+                mission: '야구공이 머리에 날아와 부딪히는 상황입니다. 충격이 가해진 지점에 발생하는 뇌 손상을 예측해보세요.',
+                instruction: '타격 손상(Coup Injury)이 발생할 위치를 클릭하세요.',
+                correctClicks: ['coup'],
+                type: 'click',
+                animationClass: 'animate-level1',
+                explanation: '정답입니다! 타격 손상(Coup Injury)은 충격이 가해진 두개골 바로 아래 뇌 조직에 발생하는 손상입니다. 야구공처럼 비교적 느리고 작은 물체와의 충돌에서는 반대편에 생기는 반충 손상(Contrecoup)은 거의 나타나지 않습니다.',
+                hint: '힌트: 공이 부딪힌 지점을 생각해보세요. 충격은 어디에 집중될까요? 뇌는 충격 지점 바로 아래에서 가장 큰 손상을 입습니다.',
+                aiQuestions: ['타격 손상의 대표적인 증상은 뭐야?', '타격 손상은 어떻게 치료해?', '일상 생활에서 타격 손상을 예방하는 방법 알려줘.']
+            },
+            2: {
+                title: 'Level 2: 감속 손상 (Deceleration Injury)',
+                mission: '빠르게 달리던 자동차가 벽에 충돌하여 급정거하는 상황입니다. 뇌는 관성에 의해 어떻게 움직이고 손상될까요?',
+                instruction: '1차 손상과 2차 손상이 발생할 위치를 순서대로 클릭하세요.',
+                correctClicks: ['coup', 'counter-coup'],
+                type: 'click',
+                animationClass: 'animate-level2',
+                explanation: '정확합니다! 자동차가 멈춰도 뇌는 관성에 의해 앞으로 계속 나아가 전두엽이 두개골에 부딪힙니다(1차 타격 손상). 그 후, 반동으로 인해 뒤로 튕겨나가 후두엽이 두개골에 다시 부딪힙니다(2차 반충 손상).',
+                hint: '힌트: 뇌는 두개골 안에서 따로 움직입니다. 몸이 앞으로 쏠릴 때 뇌는 어디에 먼저 부딪힐까요? 그리고 그 다음은요?',
+                aiQuestions: ['감속 손상이 가속 손상보다 더 위험해?', '반충 손상이 더 심각한 이유는 뭐야?', '자동차 사고 시 뇌손상을 줄이려면?']
+            },
+            3: {
+                title: 'Level 3: 가속 손상 (Acceleration Injury)',
+                mission: '정차 중인 자동차를 뒤에서 다른 차가 들이받았습니다. 머리가 뒤로 강하게 젖혀지는 이 상황에서 뇌 손상은 어떻게 발생할까요?',
+                instruction: '1차 손상과 2차 손상이 발생할 위치를 순서대로 클릭하세요.',
+                correctClicks: ['counter-coup', 'coup'],
+                type: 'click',
+                animationClass: 'animate-level3',
+                explanation: '완벽합니다! 머리가 뒤로 젖혀지면서 뇌는 뒤쪽(후두엽) 두개골에 먼저 부딪힙니다(1차 타격 손상). 그 다음 반동으로 앞으로 튕겨나가 앞쪽(전두엽) 두개골에 부딪혀 2차 반충 손상을 입게 됩니다.',
+                hint: '힌트: 이번엔 머리가 뒤로 먼저 움직입니다. 뇌는 어디에 먼저 부딪힐까요? 감속 손상(Level 2)과는 정반대의 순서입니다.',
+                aiQuestions: ['채찍질 손상이란 정확히 뭐야?', '헤드레스트가 왜 중요해?', '가속 손상 후 회복 과정은 어때?']
+            },
+            4: {
+                title: 'Level 4: 미만성 축삭 손상 (DAI)',
+                mission: '측면 충돌로 차가 회전하는 복합 사고입니다. 뇌가 비틀리는 이 상황에서 어떤 손상이 주로 발생할지 진단하세요.',
+                instruction: '애니메이션과 회전력 미터를 보고, 미만성 축삭 손상(DAI)이 발생했다고 생각되면 진단 버튼을 누르세요.',
+                correctClicks: ['dai-diagnose'],
+                type: 'diagnose',
+                animationClass: 'animate-level4',
+                explanation: '정확한 진단입니다! 직접적인 타격보다 회전력이 가해질 때, 뇌 내부의 신경망(축삭)이 광범위하게 손상되는 DAI가 발생합니다. 이는 CT로도 찾기 힘든 미세한 손상이지만, 가장 심각한 후유증의 원인이 됩니다.',
+                hint: '힌트: 회전력 미터가 크게 치솟았습니다. 뇌가 앞뒤가 아닌, 비틀리는 방향으로 움직였습니다. 이는 국소적인 타박상보다는 뇌 전체에 걸친 손상을 의미합니다.',
+                aiQuestions: ['DAI는 왜 CT로 진단하기 어려워?', 'DAI의 장기적인 후유증은?', '회전력이 뇌에 치명적인 이유는 뭐야?']
+            }
+        };
+
+        let currentLevel = 0;
+        let currentLevelTopic = '';
+        let playerClicks = [];
+        const clearedLevels = new Set();
+        
+        const levelTitleEl = document.getElementById('level-title');
+        const missionDescriptionEl = document.getElementById('mission-description');
+        const instructionEl = document.getElementById('instruction');
+        const simulationContainer = document.getElementById('simulation-container');
+        const brainEl = document.getElementById('brain');
+        const skullEl = document.getElementById('skull');
+        const targetAreas = document.querySelectorAll('.target-area');
+        const replayBtn = document.getElementById('replay-btn');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalExplanation = document.getElementById('modal-explanation');
+        const modalButtons = document.getElementById('modal-buttons');
+        const levelButtons = document.querySelectorAll('.level-btn');
+        const daiBtn = document.getElementById('dai-diagnose-btn');
+        const rotationMeterContainer = document.getElementById('rotation-meter-container');
+        const rotationMeterBar = document.getElementById('rotation-meter-bar');
+        const summaryModal = document.getElementById('summary-modal');
+        const summaryCloseBtn = document.getElementById('summary-close-btn');
+        
+        // AI Modal elements
+        const aiModal = document.getElementById('ai-modal');
+        const aiResponseArea = document.getElementById('ai-response-area');
+        const aiLoader = document.getElementById('ai-loader');
+        const suggestedQuestionsContainer = document.getElementById('suggested-questions');
+        const userQuestionInput = document.getElementById('user-question');
+        const aiAskBtn = document.getElementById('ai-ask-btn');
+        const aiCloseBtn = document.getElementById('ai-close-btn');
+
+        async function callGeminiAPI(userQuery, topic) {
+            aiResponseArea.classList.add('hidden');
+            aiLoader.classList.remove('hidden');
+            aiAskBtn.disabled = true;
+
+            try {
+                // Call our own serverless function endpoint
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userQuery, topic }) // Send data to our function
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server Error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const text = result.text;
+
+                if (text) {
+                    aiResponseArea.innerText = text;
+                } else {
+                    aiResponseArea.innerText = '죄송합니다, 답변을 생성하는 데 실패했습니다. 잠시 후 다시 시도해주세요.';
+                }
+            } catch (error) {
+                console.error("API call failed:", error);
+                aiResponseArea.innerText = '오류가 발생했습니다. 네트워크 연결을 확인하거나 Vercel 환경 변수가 올바르게 설정되었는지 확인해주세요.';
+            } finally {
+                aiResponseArea.classList.remove('hidden');
+                aiLoader.classList.add('hidden');
+                aiAskBtn.disabled = false;
+            }
+        }
+
+
+        function loadLevel(level) {
+            currentLevel = level;
+            playerClicks = [];
+            targetAreas.forEach(area => { area.classList.remove('clicked'); area.style.display = 'none'; });
+            modal.classList.add('hidden');
+            simulationContainer.className = 'brain-container'; 
+            brainEl.style.animation = '';
+            skullEl.style.animation = '';
+            replayBtn.classList.remove('hidden');
+            daiBtn.classList.add('hidden');
+            rotationMeterContainer.style.display = 'none';
+            rotationMeterBar.style.width = '0%';
+
+            const levelConfig = gameData[level];
+            if (!levelConfig) return;
+            
+            currentLevelTopic = levelConfig.title;
+
+            levelButtons.forEach(btn => {
+                btn.classList.toggle('bg-cyan-600', btn.dataset.level == level && level < 4);
+                btn.classList.toggle('bg-red-600', btn.dataset.level == level && level == 4);
+                btn.classList.toggle('bg-gray-700', btn.dataset.level != level);
+            });
+
+            levelTitleEl.textContent = levelConfig.title;
+            missionDescriptionEl.textContent = levelConfig.mission;
+            instructionEl.textContent = levelConfig.instruction;
+            
+            if (levelConfig.type === 'click') {
+                targetAreas.forEach(area => area.style.display = 'block');
+            } else if (levelConfig.type === 'diagnose') {
+                daiBtn.classList.remove('hidden');
+                rotationMeterContainer.style.display = 'block';
+            }
+
+            if (levelConfig.animationClass) {
+                setTimeout(() => {
+                    simulationContainer.classList.add(levelConfig.animationClass);
+                    if(level === 4) {
+                        setTimeout(() => { rotationMeterBar.style.width = '95%'; }, 100);
+                    }
+                }, 100);
+            }
+        }
+        
+        function handleTargetClick(e) {
+            if (currentLevel === 0 || gameData[currentLevel].type !== 'click') return;
+            const area = e.target.dataset.area;
+            if (playerClicks.includes(area)) return;
+
+            e.target.classList.add('clicked');
+            playerClicks.push(area);
+
+            const levelConfig = gameData[currentLevel];
+            if (playerClicks.length === levelConfig.correctClicks.length) {
+                checkAnswer();
+            }
+        }
+        
+        daiBtn.addEventListener('click', () => {
+             if (currentLevel === 0 || gameData[currentLevel].type !== 'diagnose') return;
+             playerClicks.push('dai-diagnose');
+             checkAnswer();
+        });
+
+        function checkAnswer() {
+            const levelConfig = gameData[currentLevel];
+            const isCorrect = JSON.stringify(playerClicks) === JSON.stringify(levelConfig.correctClicks);
+            
+            if(isCorrect) {
+                clearedLevels.add(currentLevel);
+                if (clearedLevels.size === Object.keys(gameData).length) {
+                    summaryModal.classList.remove('hidden');
+                } else {
+                    showResult(true, levelConfig.explanation);
+                }
+            } else {
+                showResult(false, levelConfig.hint);
+            }
+        }
+
+        function showResult(correct, text) {
+            modal.classList.remove('hidden');
+            modalExplanation.textContent = text;
+            modalButtons.innerHTML = ''; // Clear previous buttons
+
+            if (correct) {
+                modalTitle.textContent = '정답입니다!';
+                modalTitle.className = 'text-3xl font-bold mb-4 text-green-400';
+                
+                const askAiButton = document.createElement('button');
+                askAiButton.innerHTML = '✨ AI에게 더 물어보기';
+                askAiButton.className = 'w-full font-bold py-3 px-4 rounded-lg transition-colors bg-purple-600 hover:bg-purple-700 text-white';
+                askAiButton.onclick = openAiModal;
+                
+                const nextLevelButton = document.createElement('button');
+                nextLevelButton.textContent = '다음 레벨로';
+                nextLevelButton.className = 'w-full font-bold py-3 px-4 rounded-lg transition-colors bg-green-500 hover:bg-green-600 text-white';
+                nextLevelButton.onclick = () => {
+                    modal.classList.add('hidden');
+                    const nextLevel = currentLevel < Object.keys(gameData).length ? currentLevel + 1 : 1;
+                    loadLevel(nextLevel);
+                };
+                
+                modalButtons.appendChild(askAiButton);
+                modalButtons.appendChild(nextLevelButton);
+            } else {
+                modalTitle.textContent = '오답입니다';
+                modalTitle.className = 'text-3xl font-bold mb-4 text-red-400';
+
+                const retryButton = document.createElement('button');
+                retryButton.textContent = '다시 시도';
+                retryButton.className = 'w-full font-bold py-3 px-4 rounded-lg transition-colors bg-red-500 hover:bg-red-600 text-white';
+                retryButton.onclick = () => {
+                    modal.classList.add('hidden');
+                    loadLevel(currentLevel);
+                };
+                modalButtons.appendChild(retryButton);
+            }
+        }
+
+        function openAiModal() {
+            modal.classList.add('hidden');
+            aiModal.classList.remove('hidden');
+            userQuestionInput.value = '';
+            aiResponseArea.innerText = 'AI 전문가가 답변을 기다리고 있습니다. 아래 예시 질문을 클릭하거나 직접 질문을 입력해보세요.';
+            
+            suggestedQuestionsContainer.innerHTML = '';
+            const questions = gameData[currentLevel].aiQuestions || [];
+            questions.forEach(q => {
+                const btn = document.createElement('button');
+                btn.textContent = q;
+                btn.className = 'text-sm bg-gray-700 hover:bg-purple-500 text-white py-1 px-3 rounded-full transition-colors';
+                btn.onclick = () => {
+                    userQuestionInput.value = q;
+                };
+                suggestedQuestionsContainer.appendChild(btn);
+            });
+        }
+
+        targetAreas.forEach(area => area.addEventListener('click', handleTargetClick));
+        
+        levelButtons.forEach(button => {
+            button.addEventListener('click', (e) => loadLevel(parseInt(e.target.dataset.level)));
+        });
+
+        replayBtn.addEventListener('click', () => {
+             if (currentLevel === 0) return;
+             loadLevel(currentLevel);
+        });
+        
+        summaryCloseBtn.addEventListener('click', () => {
+            summaryModal.classList.add('hidden');
+            clearedLevels.clear();
+            loadLevel(1);
+        });
+        
+        aiAskBtn.addEventListener('click', () => {
+            const query = userQuestionInput.value.trim();
+            if (query) {
+                callGeminiAPI(query, currentLevelTopic);
+            }
+        });
+        
+        aiCloseBtn.addEventListener('click', () => {
+            aiModal.classList.add('hidden');
+        });
+        
+        loadLevel(1); // Start the game at level 1
+
+    </script>
+</body>
+</html>
+
