@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>뇌 손상 시뮬레이터: 크리티컬 임팩트</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
@@ -243,6 +244,12 @@
              <p class="text-center text-sm text-gray-500 mt-6">안산대학교 물리치료학과 심경섭 교수</p>
              <button id="summary-close-btn" class="w-full mt-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors">다시 플레이하기</button>
         </div>
+    </div>
+
+    <!-- BGM Control Button -->
+    <div id="bgm-control" class="fixed bottom-4 right-4 z-50 cursor-pointer bg-gray-700 p-3 rounded-full shadow-lg hover:bg-cyan-600 transition-colors">
+        <svg id="speaker-on-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white hidden"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        <svg id="speaker-off-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
     </div>
 
     <script>
@@ -532,7 +539,113 @@
         
         loadLevel(1); // Start the game at level 1
 
+        // BGM Control
+        const bgmControlButton = document.getElementById('bgm-control');
+        const speakerOnIcon = document.getElementById('speaker-on-icon');
+        const speakerOffIcon = document.getElementById('speaker-off-icon');
+        
+        // --- BGM Section Updated for Granzort Theme (Rock Version) ---
+        
+        const reverb = new Tone.Reverb({ decay: 1.5, wet: 0.3 }).toDestination();
+        const distortion = new Tone.Distortion(0.4).toDestination();
+
+        // Main synth with distortion for an electric guitar feel
+        const mainSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
+            envelope: {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.5,
+                release: 0.4,
+                attackCurve: "exponential"
+            },
+            volume: -12 // Lowered volume
+        }).chain(distortion, reverb);
+
+        // A pad synth for an epic, grand feeling
+        const padSynth = new Tone.PolySynth(Tone.AMSynth, {
+            harmonicity: 1.01,
+            envelope: { attack: 2, release: 2 },
+            volume: -22 // Very subtle background pad
+        }).connect(reverb);
+        
+        const kick = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 10,
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: "exponential" },
+            volume: -6 // Lowered volume
+        }).toDestination();
+
+        const snare = new Tone.NoiseSynth({
+            noise: { type: "white" },
+            envelope: { attack: 0.005, decay: 0.1, sustain: 0 },
+            volume: -15 // Lowered volume
+        }).toDestination();
+        
+        const cymbal = new Tone.MetalSynth({
+            frequency: 250,
+            envelope: { attack: 0.001, decay: 1.4, release: 0.2 },
+            harmonicity: 5.1,
+            modulationIndex: 32,
+            resonance: 4000,
+            octaves: 1.5,
+            volume: -18 // Lowered volume
+        }).toDestination();
+
+
+        // The iconic Granzort intro riff
+        const melody = new Tone.Sequence((time, note) => {
+            mainSynth.triggerAttackRelease(note, "16n", time);
+        }, [
+            'G4', 'A4', 'C5', 'B4', 'A4', 'G4', 'C5', null,
+            'G4', 'A4', 'C5', 'D5', 'C5', 'A4', 'G4', null
+        ], "8n").start("0m");
+
+        // Background pad chords to make it feel epic
+        const padChords = new Tone.Part((time, value) => {
+            padSynth.triggerAttackRelease(value.chord, "2m", time);
+        }, [
+            { time: "0m", chord: ["G3", "D4", "G4"] },
+            { time: "2m", chord: ["C3", "G3", "C4"] }
+        ]).start(0);
+        padChords.loop = true;
+        padChords.loopEnd = "4m";
+        
+        const kickLoop = new Tone.Loop(time => {
+            kick.triggerAttackRelease("C2", "8n", time);
+        }, "4n").start("0m");
+
+        const snareLoop = new Tone.Loop(time => {
+            snare.triggerAttackRelease("8n", time);
+        }, "2n").start("4n");
+
+        const cymbalLoop = new Tone.Loop(time => {
+            cymbal.triggerAttack(time);
+        }, "4m").start(0); // Cymbal crash every 4 measures
+
+        // Energetic anime theme tempo
+        Tone.Transport.bpm.value = 160;
+
+        // --- End of BGM Update ---
+
+        bgmControlButton.addEventListener('click', async () => {
+            // Audio context must be started by a user gesture
+            await Tone.start();
+
+            if (Tone.Transport.state === 'started') {
+                Tone.Transport.stop();
+                speakerOnIcon.classList.add('hidden');
+                speakerOffIcon.classList.remove('hidden');
+            } else {
+                Tone.Transport.start();
+                speakerOnIcon.classList.remove('hidden');
+                speakerOffIcon.classList.add('hidden');
+            }
+        });
+
     </script>
 </body>
 </html>
+```
 
